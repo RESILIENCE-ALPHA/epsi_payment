@@ -29,7 +29,7 @@ ARG REVISION=unknown
 
 LABEL org.opencontainers.image.title="epsi-pay-front" \
       org.opencontainers.image.description="EPSI Pay — interface web (React) servie par nginx" \
-      org.opencontainers.image.source="https://github.com/RESILIENCE-ALPHA/epsi_pay" \
+      org.opencontainers.image.source="https://github.com/RESILIENCE-ALPHA/epsi_payment" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
 

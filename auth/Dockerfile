@@ -51,7 +51,7 @@ ARG REVISION=unknown
 
 LABEL org.opencontainers.image.title="epsi-pay-auth" \
       org.opencontainers.image.description="EPSI Pay — service d'authentification (sessions, brute force, blocage IP)" \
-      org.opencontainers.image.source="https://github.com/RESILIENCE-ALPHA/epsi_pay" \
+      org.opencontainers.image.source="https://github.com/RESILIENCE-ALPHA/epsi_payment" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
 

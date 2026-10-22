@@ -33,7 +33,7 @@ ARG REVISION=unknown
 
 LABEL org.opencontainers.image.title="epsi-pay-db-init" \
       org.opencontainers.image.description="EPSI Pay — initialisation du schéma et seed de la base PostgreSQL" \
-      org.opencontainers.image.source="https://github.com/RESILIENCE-ALPHA/epsi_pay" \
+      org.opencontainers.image.source="https://github.com/RESILIENCE-ALPHA/epsi_payment" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
 
