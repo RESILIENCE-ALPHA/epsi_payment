@@ -25,8 +25,11 @@ epsi_pay/
 │
 ├── api/                     # 🌐 Passerelle (seule frontière de confiance, résout l'IP cliente)
 │
-└── front/                   # 🖥️ Interface web React (nginx : SPA + relais /api)
-    └── README.md            # Écrans, charte, déploiement
+├── front/                   # 🖥️ Interface web React (nginx : SPA + relais /api)
+│   └── README.md            # Écrans, charte, déploiement
+│
+└── k8s/                     # ☸️ Déploiement minikube des images GHCR + exposition réseau
+    └── README.md            # Guide pas à pas
 ```
 
 Chemin d'une requête : `navigateur → front (nginx, :8080) → api (passerelle) → auth / payment → PostgreSQL`.
@@ -42,6 +45,8 @@ docker compose up -d --build
 
 - Interface : **http://localhost:8080** (point d'entrée public)
 - Passerelle et Swagger : http://localhost:3000/docs (machine locale uniquement)
+
+Sur Kubernetes (minikube), avec les images publiées par la CI : voir [`k8s/README.md`](./k8s/README.md).
 
 ---
 

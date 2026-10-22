@@ -5,8 +5,10 @@
 
 # ------------------------------------------
 # Stage 1: Build Vite (dépendances du workspace front uniquement)
+# Fichiers statiques indépendants de l'architecture : construits sur la plateforme native du runner
+# (pas d'émulation QEMU en CI multi-plateforme)
 # ------------------------------------------
-FROM node:22-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
 WORKDIR /app
 

@@ -1,0 +1,58 @@
+# Interface web (nginx non-root) : point d'entrée unique, relaie /api vers la passerelle
+apiVersion: v1
+kind: Service
+metadata:
+  name: front
+spec:
+  selector:
+    app: front
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: front
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: front
+  template:
+    metadata:
+      labels:
+        app: front
+    spec:
+      # Pas de variables <SERVICE>_PORT=tcp://... injectées : AUTH_PORT et PAYMENT_PORT sont lus par le code
+      enableServiceLinks: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+      containers:
+        - name: front
+          image: epsi-pay-front
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            # Nom complet : nginx résout lui-même la passerelle (sans les domaines de recherche du pod)
+            - name: API_UPSTREAM
+              value: http://api.epsi-pay.svc.cluster.local:3000
+            - name: NGINX_RESOLVER
+              value: kube-dns.kube-system.svc.cluster.local
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 128Mi }

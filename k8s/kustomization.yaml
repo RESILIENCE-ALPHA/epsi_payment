@@ -1,0 +1,43 @@
+# Déploiement complet : kubectl apply -k k8s/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: epsi-pay
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: epsi-pay
+
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - db-init.yaml
+  - auth.yaml
+  - api.yaml
+  - payment.yaml
+  - front.yaml
+
+# Mots de passe et jetons, lus depuis secrets.env (voir secrets.example.env).
+# Le suffixe de hachage ajouté au nom redémarre les pods quand une valeur change.
+secretGenerator:
+  - name: epsi-pay-secrets
+    envs:
+      - secrets.env
+
+# Images publiées par la CI. RELEASE-1.0 suit la branche ; pour figer une version : newTag: sha-<commit>
+images:
+  - name: epsi-pay-db-init
+    newName: ghcr.io/resilience-alpha/epsi-pay-db-init
+    newTag: RELEASE-1.0
+  - name: epsi-pay-auth
+    newName: ghcr.io/resilience-alpha/epsi-pay-auth
+    newTag: RELEASE-1.0
+  - name: epsi-pay-api
+    newName: ghcr.io/resilience-alpha/epsi-pay-api
+    newTag: RELEASE-1.0
+  - name: epsi-pay-payment
+    newName: ghcr.io/resilience-alpha/epsi-pay-payment
+    newTag: RELEASE-1.0
+  - name: epsi-pay-front
+    newName: ghcr.io/resilience-alpha/epsi-pay-front
+    newTag: RELEASE-1.0

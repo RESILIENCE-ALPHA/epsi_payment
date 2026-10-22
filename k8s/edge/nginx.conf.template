@@ -1,0 +1,40 @@
+# Relais local devant minikube (rôle d'un Ingress) : lancé par k8s/expose.sh, nginx natif macOS.
+# Il tourne hors de Docker pour voir la vraie IP du visiteur (Docker Desktop la masque),
+# puis la transmet seule dans X-Forwarded-For : un en-tête forgé par le client est écrasé.
+# Variables remplacées par expose.sh : __EDGE_PORT__, __TUNNEL_PORT__
+
+worker_processes 1;
+pid edge.pid;
+error_log stderr warn;
+
+events {
+    worker_connections 512;
+}
+
+http {
+    access_log /dev/stdout;
+    server_tokens off;
+
+    client_body_temp_path tmp/body;
+    proxy_temp_path tmp/proxy;
+    fastcgi_temp_path tmp/fastcgi;
+    uwsgi_temp_path tmp/uwsgi;
+    scgi_temp_path tmp/scgi;
+
+    upstream front_tunnel {
+        server 127.0.0.1:__TUNNEL_PORT__;
+    }
+
+    server {
+        listen __EDGE_PORT__;
+
+        location / {
+            proxy_pass http://front_tunnel;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 3s;
+        }
+    }
+}
