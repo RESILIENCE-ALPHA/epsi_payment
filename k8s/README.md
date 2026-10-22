@@ -111,6 +111,10 @@ Port différent : `EDGE_PORT=8081 ./k8s/expose.sh`.
 kubectl -n epsi-pay port-forward svc/grafana 3300:3000
 ```
 
+> Le port-forward s'arrête si le pod Grafana redémarre (mise à jour, `kubectl apply`) : le navigateur
+> affiche alors « Failed to fetch ». Relancer la commande, ou la garder active en boucle :
+> `while true; do kubectl -n epsi-pay port-forward svc/grafana 3300:3000; sleep 1; done`
+
 Ouvrir http://localhost:3300 : le tableau de bord **EPSI Pay — Attaque et remédiation** s'affiche
 sans connexion (lecture seule, actualisé toutes les 5 s). Pour modifier : bouton *S'inscrire* →
 `admin` / valeur de `GRAFANA_ADMIN_PASSWORD` dans `k8s/secrets.env`.
