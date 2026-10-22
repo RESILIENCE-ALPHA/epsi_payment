@@ -16,6 +16,7 @@ resources:
   - api.yaml
   - payment.yaml
   - front.yaml
+  - grafana/grafana.yaml
 
 # Mots de passe et jetons, lus depuis secrets.env (voir secrets.example.env).
 # Le suffixe de hachage ajouté au nom redémarre les pods quand une valeur change.
@@ -23,6 +24,18 @@ secretGenerator:
   - name: epsi-pay-secrets
     envs:
       - secrets.env
+
+# Grafana : source de données et tableau de bord provisionnés depuis grafana/
+configMapGenerator:
+  - name: grafana-datasources
+    files:
+      - grafana/datasource.yaml
+  - name: grafana-dashboard-providers
+    files:
+      - grafana/dashboards.yaml
+  - name: grafana-dashboards
+    files:
+      - grafana/epsi-pay-attaque.json
 
 # Images publiées par la CI. RELEASE-1.0 suit la branche ; pour figer une version : newTag: sha-<commit>
 images:

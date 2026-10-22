@@ -23,6 +23,7 @@ un Ingress (d'où `TRUST_PROXY=2` sur la passerelle).
 | `auth.yaml`, `api.yaml`, `payment.yaml`, `front.yaml` | Deployment + Service (ClusterIP) de chaque service |
 | `secrets.example.env` | Modèle des mots de passe et jetons (copie locale `secrets.env`, ignorée par git) |
 | `expose.sh`, `edge/` | Tunnel + nginx local pour l'exposition |
+| `grafana/` | Grafana : source PostgreSQL en lecture seule + tableau de bord « Attaque et remédiation » |
 
 ## Prérequis (une seule fois)
 
@@ -104,6 +105,31 @@ Port différent : `EDGE_PORT=8081 ./k8s/expose.sh`.
      'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select \"ipAddress\", \"attemptedEmail\", \"createdAt\" from login_attempts order by \"createdAt\" desc limit 5"'
    ```
 
+### 7. Tableau de bord Grafana
+
+```bash
+kubectl -n epsi-pay port-forward svc/grafana 3300:3000
+```
+
+Ouvrir http://localhost:3300 : le tableau de bord **EPSI Pay — Attaque et remédiation** s'affiche
+sans connexion (lecture seule, actualisé toutes les 5 s). Pour modifier : bouton *S'inscrire* →
+`admin` / valeur de `GRAFANA_ADMIN_PASSWORD` dans `k8s/secrets.env`.
+
+| Panneau | Pendant la démo |
+|---|---|
+| Échecs de connexion, tentatives par minute | Le pic du brute force (rouge), puis ses requêtes refusées par le blocage (bleu) |
+| IP les plus actives en échec | L'IP de l'attaquant, et si elle est bloquée |
+| Incidents détectés | Délai de détection (MTTD) et de résolution (MTTR) ; zones rouges sur les graphiques |
+| Actions de remédiation, IP bloquées | Ce que le moteur de remédiation a fait, et en combien de temps |
+| Paiements par minute, paiement test réussi il y a | La preuve : « paiement test : ça remarche ? » |
+
+Grafana lit directement PostgreSQL avec le compte `grafana_ro` (lecture seule, sans accès aux
+tables `users` ni `sessions`). Le tableau de bord est un fichier versionné
+(`grafana/epsi-pay-attaque.json`) : une modification faite dans l'interface est perdue au
+redémarrage du pod ; l'exporter (*Partager → Exporter*) et remplacer le fichier.
+
+Consommation des pods : `minikube addons enable metrics-server`, puis `kubectl top pods -n epsi-pay`.
+
 ## Au quotidien
 
 | Besoin | Commande |
@@ -116,6 +142,7 @@ Port différent : `EDGE_PORT=8081 ./k8s/expose.sh`.
 | Swagger (machine locale) | `kubectl -n epsi-pay port-forward svc/api 3000:3000` puis http://localhost:3000/docs (si `ENABLE_DOCS=true`) |
 | Accès SQL (Prisma Studio, outils ML) | `kubectl -n epsi-pay port-forward svc/postgres 5433:5432` puis `localhost:5433` |
 | Réinitialiser les données de démo | voir ci-dessous |
+| Grafana (machine locale) | `kubectl -n epsi-pay port-forward svc/grafana 3300:3000` puis http://localhost:3300 |
 | Mettre en pause | `minikube stop` (les données sont conservées) |
 | Tout supprimer | `kubectl delete namespace epsi-pay` (données comprises) puis `minikube delete` |
 
