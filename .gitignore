@@ -11,3 +11,6 @@ pnpm-debug.log*
 coverage/
 .vscode/
 .idea/
+
+# Secrets Kubernetes locaux (voir k8s/secrets.example.env)
+k8s/secrets.env

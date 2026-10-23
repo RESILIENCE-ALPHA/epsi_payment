@@ -1,0 +1,24 @@
+# VCS & IDE
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+
+# Dépendances et artefacts locaux (réinstallés / recompilés dans l'image)
+**/node_modules
+**/dist
+**/coverage
+*.tsbuildinfo
+
+# Secrets & logs
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+
+# Documentation & ressources hors runtime
+informations
+**/*.md
+**/k8s

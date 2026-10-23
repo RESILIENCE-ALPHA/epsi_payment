@@ -29,11 +29,14 @@ async function main() {
   await prisma.user.deleteMany();
 
   // 1. Création des utilisateurs
+  // Mot de passe pour tous les comptes de test : Password123!
+  const defaultPasswordHash = '$2b$10$rRgtBEDisNqePyocJemQqOHChFGO9g7wvO/pEj2QQ0MM53ve/hQXq';
+
   const alice = await prisma.user.create({
     data: {
       email: 'alice@epsi.fr',
       name: 'Alice Martin',
-      passwordHash: '$2b$10$epsiWorkshopPasswordHashAliceSample123',
+      passwordHash: defaultPasswordHash,
       role: UserRole.CLIENT,
       status: UserStatus.ACTIVE,
     },
@@ -43,7 +46,7 @@ async function main() {
     data: {
       email: 'bob@epsi.fr',
       name: 'Bob Dupont',
-      passwordHash: '$2b$10$epsiWorkshopPasswordHashBobSample123456',
+      passwordHash: defaultPasswordHash,
       role: UserRole.CLIENT,
       status: UserStatus.ACTIVE,
     },
@@ -53,7 +56,7 @@ async function main() {
     data: {
       email: 'store@merchant.com',
       name: 'Boutique Démo EPSI',
-      passwordHash: '$2b$10$epsiWorkshopPasswordHashMerchantSample',
+      passwordHash: defaultPasswordHash,
       role: UserRole.MERCHANT,
       status: UserStatus.ACTIVE,
     },
@@ -64,7 +67,7 @@ async function main() {
     data: {
       email: 'system-bot@epsi-pay.internal',
       name: 'Système Test Remédiation',
-      passwordHash: '$2b$10$internalSystemRemediationBotSecretHash',
+      passwordHash: defaultPasswordHash,
       role: UserRole.ADMIN,
       status: UserStatus.ACTIVE,
     },

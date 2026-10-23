@@ -3,14 +3,17 @@
     "target": "ES2022",
     "module": "CommonJS",
     "lib": ["ES2022"],
-    "types": ["node"],
-    "rootDir": "./",
-    "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["database/**/*", "auth/**/*", "payment/**/*"]
+  "files": [],
+  "references": [
+    { "path": "./database" },
+    { "path": "./api" },
+    { "path": "./auth" },
+    { "path": "./payment" }
+  ]
 }

@@ -2,37 +2,41 @@
   "name": "epsi-pay",
   "version": "1.0.0",
   "description": "Plateforme de paiement résiliente - Project RESILIENCE-ALPHA",
-  "main": "dist/index.js",
-  "type": "commonjs",
-  "scripts": {
-    "build": "tsc",
-    "db:up": "docker compose up -d",
-    "db:down": "docker compose down",
-    "prisma:generate": "prisma generate --schema=database/prisma/schema.prisma",
-    "prisma:push": "prisma db push --schema=database/prisma/schema.prisma",
-    "prisma:studio": "prisma studio --schema=database/prisma/schema.prisma",
-    "db:seed": "tsx database/prisma/seed.ts",
-    "db:seed:10k": "tsx database/prisma/seed-10k.ts",
-    "db:setup": "docker compose up -d && prisma db push --schema=database/prisma/schema.prisma && tsx database/prisma/seed-10k.ts"
-  },
-  "keywords": [
+  "private": true,
+  "workspaces": [
+    "database",
+    "api",
+    "auth",
     "payment",
-    "resilience",
-    "workshop"
+    "front"
   ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:api": "npm run test --workspace=api",
+    "test:db": "npm run test --workspace=database",
+    "test:auth": "npm run test --workspace=auth",
+    "test:payment": "npm run test --workspace=payment",
+    "test:payment:integration": "npm run test:integration --workspace=payment",
+    "test:front": "npm run test --workspace=front",
+    "dev:api": "npm run dev --workspace=api",
+    "dev:auth": "npm run dev --workspace=auth",
+    "dev:payment": "npm run dev --workspace=payment",
+    "dev:front": "npm run dev --workspace=front",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:init": "npm run init --workspace=database",
+    "db:seed": "npm run seed --workspace=database",
+    "db:seed:10k": "npm run seed:10k --workspace=database",
+    "prisma:generate": "npm run prisma:generate --workspace=database",
+    "prisma:push": "npm run prisma:push --workspace=database",
+    "prisma:migrate": "npm run prisma:migrate --workspace=database",
+    "prisma:deploy": "npm run prisma:deploy --workspace=database",
+    "prisma:studio": "npm run prisma:studio --workspace=database",
+    "compose:up": "docker compose up -d --build",
+    "compose:down": "docker compose down"
+  },
+  "keywords": ["payment", "resilience", "workshop"],
   "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "@types/node": "^26.6.5",
-    "prisma": "^6.19.3",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.19.3"
-  },
-  "prisma": {
-    "schema": "database/prisma/schema.prisma",
-    "seed": "tsx database/prisma/seed.ts"
-  }
+  "license": "ISC"
 }

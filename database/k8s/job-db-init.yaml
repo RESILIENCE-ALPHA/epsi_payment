@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: epsi-pay-db-init
+  labels:
+    app.kubernetes.io/name: epsi-pay
+    app.kubernetes.io/component: database-migration
+    app.kubernetes.io/part-of: resilience-alpha
+spec:
+  # Nombre maximal de tentatives avant de marquer le Job en échec
+  backoffLimit: 4
+  
+  # Nettoyage automatique du Job 300 secondes (5 min) après son achèvement
+  ttlSecondsAfterFinished: 300
+  
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: epsi-pay
+        app.kubernetes.io/component: database-migration
+    spec:
+      restartPolicy: OnFailure
+      
+      containers:
+        - name: db-init
+          image: epsi-pay-db-init:latest
+          imagePullPolicy: IfNotPresent
+          
+          env:
+            # URL de connexion à PostgreSQL dans le cluster
+            - name: DATABASE_URL
+              value: "postgresql://epsi_pay:epsi_pay_secret@epsi-pay-postgres:5432/epsi_pay_db?schema=public"
+            
+            # Type de seed : "standard" pour un cluster propre ou "10k" pour entraînement ML
+            - name: SEED_TYPE
+              value: "standard"
+
+            # if-empty : seed uniquement sur base vide → relancer le Job ne détruit jamais les données
+            - name: SEED_MODE
+              value: "if-empty"
+            
+            # Nombre maximal de tentatives d'attente de PostgreSQL
+            - name: MAX_RETRIES
+              value: "15"
+          
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

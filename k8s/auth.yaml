@@ -1,0 +1,77 @@
+# Service d'authentification : joignable uniquement dans le cluster (via la passerelle)
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+spec:
+  selector:
+    app: auth
+  ports:
+    - port: 3001
+      targetPort: 3001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      # Pas de variables <SERVICE>_PORT=tcp://... injectées : AUTH_PORT et PAYMENT_PORT sont lus par le code
+      enableServiceLinks: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: auth
+          image: epsi-pay-auth
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3001
+          env:
+            - name: PORT
+              value: "3001"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: POSTGRES_PASSWORD }
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: POSTGRES_DB }
+            - name: DATABASE_URL
+              value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?schema=public
+            - name: NODE_ENV
+              value: production
+            # Seul proxy de confiance : la passerelle, qui transmet l'IP cliente déjà résolue
+            - name: TRUST_PROXY
+              value: "1"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: JWT_SECRET }
+          # /health interroge la base : il retire le pod du trafic si PostgreSQL tombe (readiness),
+          # sans le redémarrer (liveness sur le port seul, sinon une panne BDD relancerait tous les pods)
+          readinessProbe:
+            httpGet: { path: /health, port: 3001 }
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            tcpSocket: { port: 3001 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { memory: 256Mi }

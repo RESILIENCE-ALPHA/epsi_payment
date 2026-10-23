@@ -1,0 +1,47 @@
+# Migrations Prisma + seed (si la base est vide). Idempotent : peut être rejoué sans risque.
+# Supprimé 10 min après sa réussite, pour qu'un nouveau `kubectl apply -k` puisse le recréer
+# (un Job terminé ne peut pas changer d'image).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+spec:
+  ttlSecondsAfterFinished: 600
+  # Postgres peut ne pas être prêt au premier essai : nouvelles tentatives avec délai croissant
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: Never
+      # Pas de variables <SERVICE>_PORT=tcp://... injectées : AUTH_PORT et PAYMENT_PORT sont lus par le code
+      enableServiceLinks: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: db-init
+          image: epsi-pay-db-init
+          imagePullPolicy: Always
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: POSTGRES_PASSWORD }
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: POSTGRES_DB }
+            - name: DATABASE_URL
+              value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?schema=public
+            - name: SEED_TYPE
+              value: standard
+            # if-empty : seed uniquement sur base vide ; reset : efface tout (refusé en production sans ALLOW_DATA_RESET)
+            - name: SEED_MODE
+              value: if-empty
+            # Garde-fou : reset est refusé en production tant que ce n'est pas "true" (voir k8s/README.md)
+            - name: ALLOW_DATA_RESET
+              value: "false"
+            - name: NODE_ENV
+              value: production
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }

@@ -58,7 +58,8 @@ async function generate10kData() {
       id: userId,
       email,
       name,
-      passwordHash: '$2b$10$epsiWorkshopHashedPasswordPlaceholder',
+      // Mot de passe pour tous les comptes : Password123!
+      passwordHash: '$2b$10$rRgtBEDisNqePyocJemQqOHChFGO9g7wvO/pEj2QQ0MM53ve/hQXq',
       role,
       status: UserStatus.ACTIVE,
       failedLoginAttempts: 0,

@@ -1,0 +1,29 @@
+{
+  "name": "@epsi-pay/api",
+  "version": "1.0.0",
+  "description": "Service HTTP central — Express + Swagger",
+  "main": "dist/src/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/src/server.js",
+    "test": "vitest run src/__tests__"
+  },
+  "dependencies": {
+    "@epsi-pay/database": "*",
+    "express": "^5.3.0",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "@types/supertest": "^7.2.1",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
+    "supertest": "^7.3.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,77 @@
+# Service de paiement : routes publiques via la passerelle, POST /payments/test-validation
+# pour le moteur de remédiation (http://payment.epsi-pay.svc.cluster.local:3002, jeton interne)
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment
+spec:
+  selector:
+    app: payment
+  ports:
+    - port: 3002
+      targetPort: 3002
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment
+  template:
+    metadata:
+      labels:
+        app: payment
+    spec:
+      # Pas de variables <SERVICE>_PORT=tcp://... injectées : AUTH_PORT et PAYMENT_PORT sont lus par le code
+      enableServiceLinks: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: payment
+          image: epsi-pay-payment
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3002
+          env:
+            - name: PORT
+              value: "3002"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: POSTGRES_PASSWORD }
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: POSTGRES_DB }
+            - name: DATABASE_URL
+              value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?schema=public
+            - name: NODE_ENV
+              value: production
+            - name: TRUST_PROXY
+              value: "1"
+            - name: PAYMENT_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef: { name: epsi-pay-secrets, key: PAYMENT_INTERNAL_TOKEN }
+          # /health interroge la base : il retire le pod du trafic si PostgreSQL tombe (readiness),
+          # sans le redémarrer (liveness sur le port seul, sinon une panne BDD relancerait tous les pods)
+          readinessProbe:
+            httpGet: { path: /health, port: 3002 }
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            tcpSocket: { port: 3002 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { memory: 256Mi }

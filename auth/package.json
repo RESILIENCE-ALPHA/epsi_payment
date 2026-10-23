@@ -1,0 +1,32 @@
+{
+  "name": "@epsi-pay/auth",
+  "version": "1.0.0",
+  "description": "Service d'authentification — Sessions, Brute Force, IP Blocking",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/src/server.js",
+    "test": "vitest run src/__tests__"
+  },
+  "dependencies": {
+    "@epsi-pay/database": "*",
+    "bcrypt": "^5.1.1",
+    "express": "^5.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "swagger-jsdoc": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^26.6.5",
+    "@types/supertest": "^7.2.1",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "supertest": "^7.3.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

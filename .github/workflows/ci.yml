@@ -1,0 +1,160 @@
+# ==========================================
+# CI EPSI Pay : build + tests, puis images Docker publiées sur GHCR
+#
+# - Pull request : tests + build des 5 images (validation des Dockerfiles), sans publication
+# - Push sur master / RELEASE/** : tests puis publication des images
+# - Tag vX.Y.Z : publication des tags de version (1.2.3, 1.2)
+#
+# Images : ghcr.io/<owner>/epsi-pay-{db-init,auth,api,payment,front}
+# Plateformes : linux/amd64 et linux/arm64 (une seule référence, Docker choisit la bonne)
+# Tags : sha-<court> (immuable, à utiliser en Kubernetes), nom de branche, latest (master), version (tags)
+# ==========================================
+name: CI
+
+on:
+  push:
+    branches: [master, 'RELEASE/**']
+    tags: ['v*.*.*']
+  pull_request:
+  workflow_dispatch:
+
+# Un nouveau push annule l'exécution précédente de la même branche
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build & tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Vrai PostgreSQL 15 pour les tests d'intégration payment (idempotence, concurrence, verrous)
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: epsi_pay
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: epsi_pay_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U epsi_pay -d epsi_pay_ci"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://epsi_pay:ci_password@localhost:5432/epsi_pay_ci?schema=public
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Installation des dépendances
+        run: npm ci
+
+      - name: Génération du client Prisma
+        run: npm run prisma:generate
+
+      # Ordre des workspaces : database -> api -> auth -> payment -> front (typecheck + bundle Vite)
+      - name: Build
+        run: npm run build
+
+      - name: Tests unitaires
+        run: npm test
+
+      - name: Migrations sur la base de test
+        run: npm run prisma:deploy
+
+      - name: Tests d'intégration payment (PostgreSQL)
+        run: npm run test:payment:integration
+
+  images:
+    name: Image ${{ matrix.image }}
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: epsi-pay-db-init
+            dockerfile: database/Dockerfile
+          - image: epsi-pay-auth
+            dockerfile: auth/Dockerfile
+          - image: epsi-pay-api
+            dockerfile: api/Dockerfile
+          - image: epsi-pay-payment
+            dockerfile: payment/Dockerfile
+          - image: epsi-pay-front
+            dockerfile: front/Dockerfile
+
+    # Publication uniquement depuis ce dépôt (pas depuis une PR de fork ni une PR en général)
+    env:
+      PUSH: ${{ github.event_name != 'pull_request' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # GHCR exige un nom de dépôt en minuscules (RESILIENCE-ALPHA -> resilience-alpha)
+      - name: Nom de l'image
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
+
+      - name: Tags et labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.name.outputs.image }}
+          flavor: latest=false
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Émulation arm64 sur le runner amd64 (Mac Apple Silicon, minikube local, nœuds ARM)
+      - uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Connexion à GHCR
+        if: env.PUSH == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (et publication hors PR)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ env.PUSH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            REVISION=${{ github.sha }}
+          # Cache de couches par image (npm ci, prisma generate) entre deux exécutions
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

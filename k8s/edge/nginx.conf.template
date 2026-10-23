@@ -1,0 +1,52 @@
+# Relais local devant minikube (rôle d'un Ingress) : lancé par k8s/expose.sh, nginx natif macOS.
+# Il tourne hors de Docker pour voir la vraie IP du visiteur (Docker Desktop la masque),
+# puis la transmet seule dans X-Forwarded-For : un en-tête forgé par le client est écrasé.
+# Exception : un tunnel local (redirection de port VS Code, cloudflared…) se connecte depuis
+# 127.0.0.1 ; l'IP réelle est alors celle que le tunnel a ajoutée en dernier dans X-Forwarded-For.
+# Variables remplacées par expose.sh : __EDGE_PORT__, __TUNNEL_PORT__
+
+worker_processes 1;
+pid edge.pid;
+error_log stderr warn;
+
+events {
+    worker_connections 512;
+}
+
+http {
+    # IP retenue (celle vue par la détection), puis IP de connexion au relais
+    log_format edge '$remote_addr (via $realip_remote_addr) [$time_local] "$request" $status "$http_user_agent"';
+    access_log /dev/stdout edge;
+    server_tokens off;
+
+    client_body_temp_path tmp/body;
+    proxy_temp_path tmp/proxy;
+    fastcgi_temp_path tmp/fastcgi;
+    uwsgi_temp_path tmp/uwsgi;
+    scgi_temp_path tmp/scgi;
+
+    upstream front_tunnel {
+        server 127.0.0.1:__TUNNEL_PORT__;
+    }
+
+    server {
+        listen __EDGE_PORT__;
+
+        # Seul un tunnel local est cru : un visiteur direct (réseau local) ne peut pas forger son IP.
+        # real_ip_recursive : on prend la dernière adresse non locale, celle ajoutée par le tunnel
+        # (les valeurs plus anciennes, écrites par le client, sont ignorées).
+        set_real_ip_from 127.0.0.1;
+        set_real_ip_from ::1;
+        real_ip_header X-Forwarded-For;
+        real_ip_recursive on;
+
+        location / {
+            proxy_pass http://front_tunnel;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 3s;
+        }
+    }
+}

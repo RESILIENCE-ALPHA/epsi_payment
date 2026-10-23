@@ -1,23 +1,117 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: epsi_pay_postgres
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: epsi_pay
-      POSTGRES_PASSWORD: epsi_pay_secret
-      POSTGRES_DB: epsi_pay_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U epsi_pay -d epsi_pay_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 3s
       timeout: 3s
       retries: 5
+
+  db-init:
+    image: ${IMAGE_REGISTRY:-ghcr.io/resilience-alpha}/epsi-pay-db-init:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - SEED_TYPE=${SEED_TYPE:-standard}
+      # if-empty : seed uniquement sur base vide (un redémarrage conserve les données) ; reset : efface tout ; never
+      - SEED_MODE=${SEED_MODE:-if-empty}
+      - NODE_ENV=${NODE_ENV:-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  auth:
+    image: ${IMAGE_REGISTRY:-ghcr.io/resilience-alpha}/epsi-pay-auth:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: auth/Dockerfile
+    restart: unless-stopped
+    # Pas de port publié : auth n'est joignable que via la passerelle API, seul proxy de confiance
+    # (un accès direct permettrait de forger X-Forwarded-For). Débogage : docker compose exec auth ...
+    expose:
+      - "3001"
+    environment:
+      - PORT=3001
+      - TRUST_PROXY=${AUTH_TRUST_PROXY:-1}
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  api:
+    image: ${IMAGE_REGISTRY:-ghcr.io/resilience-alpha}/epsi-pay-api:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    # Publiée sur la machine locale uniquement (Swagger, scripts) : de l'extérieur, on passe par le front.
+    # Sinon un client distant pourrait forger X-Forwarded-For, la passerelle faisant confiance à 1 proxy.
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      # Proxys de confiance devant la passerelle : 1 = nginx du front (IP cliente réelle pour le blocage)
+      - TRUST_PROXY=${API_TRUST_PROXY:-1}
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - AUTH_SERVICE_URL=http://auth:3001
+      - PAYMENT_SERVICE_URL=http://payment:3002
+      - UPSTREAM_TIMEOUT_MS=${UPSTREAM_TIMEOUT_MS:-5000}
+      # Swagger (/docs) : vide = suit NODE_ENV (actif hors production), sinon true/false
+      - ENABLE_DOCS=${ENABLE_DOCS:-}
+    # Pas de dépendance dure vers auth/payment : si l'un tombe, la passerelle reste up et répond 503 sur ses routes
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  payment:
+    image: ${IMAGE_REGISTRY:-ghcr.io/resilience-alpha}/epsi-pay-payment:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: payment/Dockerfile
+    restart: unless-stopped
+    # Comme auth : joignable uniquement via la passerelle (routes publiques) et le réseau interne
+    # (POST /payments/test-validation pour le moteur de remédiation)
+    expose:
+      - "3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - TRUST_PROXY=${PAYMENT_TRUST_PROXY:-1}
+      # Vide = route interne de validation désactivée (503)
+      - PAYMENT_INTERNAL_TOKEN=${PAYMENT_INTERNAL_TOKEN:-}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  front:
+    image: ${IMAGE_REGISTRY:-ghcr.io/resilience-alpha}/epsi-pay-front:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: front/Dockerfile
+    restart: unless-stopped
+    # Point d'entrée public : interface web + /api relayé vers la passerelle (même origine, pas de CORS)
+    ports:
+      - "${FRONT_PORT:-8080}:8080"
+    environment:
+      - API_UPSTREAM=http://api:3000
+      - NGINX_RESOLVER=127.0.0.11
+    # Pas de dépendance dure : nginx résout la passerelle à la volée et répond 503 JSON si elle est absente
 
 volumes:
   postgres_data:
