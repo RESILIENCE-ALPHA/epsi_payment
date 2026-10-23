@@ -54,7 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const result = await api.login(email, password);
-    saveSession({ token: result.token, user: result.user });
+    const token = result.accessToken ?? result.token;
+    if (!token) throw new Error('Réponse de connexion sans jeton');
+    saveSession({ token, user: result.user });
     setState({ status: 'authenticated', user: result.user });
   }, []);
 

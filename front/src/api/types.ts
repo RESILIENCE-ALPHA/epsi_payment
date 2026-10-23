@@ -14,7 +14,9 @@ export interface User {
 
 export interface LoginSuccess {
   success: true;
-  token: string;
+  /** Nom actuel du champ côté auth ; `token` reste accepté (ancien contrat) */
+  accessToken?: string;
+  token?: string;
   expiresAt: string;
   user: User;
 }
